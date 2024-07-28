@@ -19,7 +19,7 @@ import { Logger } from '@nestjs/common';
     origin: 'http://localhost:5173', 
     credentials: true,
   },
-  transports: ['websocket', 'polling'], 
+  transports: ['websocket'], 
 })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
@@ -45,19 +45,18 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   }
 
   @SubscribeMessage('join')
-  @SubscribeMessage('join')
-async handleJoin(
-  @MessageBody() data: { userId: string; room: string },
-  @ConnectedSocket() client: Socket,
-): Promise<void> {
-  try {
-    const { userId, room } = data;
-    
-    const group = await this.groupService.findByName(room);
-    if (!group) {
-      client.emit('error', { message: 'Group does not exist' });
-      return;
-    }
+  async handleJoin(
+    @MessageBody() data: { userId: string; room: string },
+    @ConnectedSocket() client: Socket,
+  ): Promise<void> {
+    try {
+      const { userId, room } = data;
+      
+      const group = await this.groupService.findById(room);
+      if (!group) {
+        client.emit('error', { message: 'Group does not exist' });
+        return;
+      }
 
     const isMember = await this.groupService.isMember(group._id.toString(), userId);
     if (!isMember) {
@@ -72,18 +71,24 @@ async handleJoin(
 
     const messages = await this.messageService.getGroupMessages(group._id.toString());
     client.emit('loadMessages', messages);
-  } catch (error) {
+  }  catch (error) {
     client.emit('error', { message: 'Failed to join room' });
   }
 }
-  @SubscribeMessage('sendMessage')
-  async handleMessage(
-    @MessageBody() data: { userId: string; room: string; content: string },
-    @ConnectedSocket() client: Socket,
-  ): Promise<void> {
+@SubscribeMessage('sendMessage')
+async handleMessage(
+  @MessageBody() data: { userId: string; room: string; content: string },
+  @ConnectedSocket() client: Socket,
+): Promise<void> {
+  try {
     const { userId, room, content } = data;
-    this.server.to(room).emit('message', { userId, room, content });
+    const savedMessage = await this.messageService.create(userId, room, content);
+    this.server.to(room).emit('message', savedMessage);
+  } catch (error) {
+    this.logger.error('Error handling message:', error);
+    client.emit('error', { message: 'Failed to send message' });
   }
+}
 
   @SubscribeMessage('createGroup')
   async handleCreateGroup(
