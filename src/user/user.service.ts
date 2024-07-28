@@ -77,4 +77,12 @@ export class UserService {
       { $pull: { members: userId } }
     ).exec();
   }
+
+  async findUserById(userId: string): Promise<User> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) {
+      throw new NotFoundException(`User with id ${userId} not found`);
+    }
+      return user;
+  }
 }

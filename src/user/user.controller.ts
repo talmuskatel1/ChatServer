@@ -57,4 +57,13 @@ export class UserController {
     }
   }
 
-}
+  @Get(':id')
+  async getUser(@Param('id') userId: string) {
+    try {
+      const user = await this.userService.findUserById(userId);
+      return user;
+    } catch (error) {
+        console.log("error in getUser function in userController", error)
+      }
+    }
+  }
