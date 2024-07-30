@@ -3,12 +3,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Group, GroupDocument } from './group.model';
 import { User, UserDocument } from '../user/user.model';
-
+import { UserService } from 'src/user/user.service';
 
 @Injectable()
 export class GroupService {
   constructor(@InjectModel(Group.name) private groupModel: Model<GroupDocument>,
-  @InjectModel(User.name) private userModel: Model<UserDocument>
+  @InjectModel(User.name) private userModel: Model<UserDocument>,
+  private userService: UserService
+
 ) {}
 
 async create(name: string, creatorId: string): Promise<GroupDocument> {
@@ -84,6 +86,37 @@ async addMember(groupId: string, userId: string): Promise<Group> {
     return group;
   }
 
+  async updateGroupPicture(groupId: string, groupPictureUrl: string): Promise<Group> {
+    console.log(`Updating group picture for group ${groupId} with URL ${groupPictureUrl}`);
+    const updatedGroup = await this.groupModel.findByIdAndUpdate(
+      groupId,
+      { $set: { groupPicture: groupPictureUrl } },
+      { new: true, select: '+groupPicture' }
+    ).exec();
+  
+    if (!updatedGroup) {
+      throw new NotFoundException(`Group with id ${groupId} not found`);
+    }
+  
+    console.log('Updated group:', JSON.stringify(updatedGroup, null, 2));
+    return updatedGroup;
+  }
+
+  async leaveGroup(userId: string, groupId: string): Promise<Group> {
+    const group = await this.groupModel.findByIdAndUpdate(
+      groupId,
+      { $pull: { members: userId } },
+      { new: true }
+    ).exec();
+
+    if (!group) {
+      throw new NotFoundException(`Group with id ${groupId} not found`);
+    }
+
+    await this.userService.removeGroup(userId, groupId);
+
+    return group;
+  }
 
 
 
@@ -95,16 +128,12 @@ async addMember(groupId: string, userId: string): Promise<Group> {
     ).exec();
   }
 
-  async getMembers(groupId: string): Promise<User[]> {
+  async getMembers(groupId: string): Promise<string[]> {
     const group = await this.groupModel.findById(groupId).exec();
     if (!group) {
       throw new NotFoundException(`Group with id ${groupId} not found`);
     }
-
-    const memberIds = group.members.map(id => new Types.ObjectId(id));
-    const members = await this.userModel.find({ _id: { $in: memberIds } }).exec();
-
-    return members;
+    return group.members.map(member => member.toString());
   }
 
   async removeMember(groupId: string, userId: string): Promise<Group> {

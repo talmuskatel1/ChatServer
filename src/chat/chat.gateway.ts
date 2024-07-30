@@ -19,7 +19,7 @@ import { Logger } from '@nestjs/common';
     origin: 'http://localhost:5173', 
     credentials: true,
   },
-  transports: ['websocket', 'polling'], 
+  transports: ['websocket'], 
 })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
@@ -45,45 +45,48 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   }
 
   @SubscribeMessage('join')
-  @SubscribeMessage('join')
 async handleJoin(
   @MessageBody() data: { userId: string; room: string },
   @ConnectedSocket() client: Socket,
-): Promise<void> {
+) {
   try {
     const { userId, room } = data;
+    console.log(`User ${userId} attempting to join room ${room}`);
     
-    const group = await this.groupService.findByName(room);
+    const group = await this.groupService.findById(room);
     if (!group) {
-      client.emit('error', { message: 'Group does not exist' });
-      return;
+      throw new Error('Group not found');
     }
-
-    const isMember = await this.groupService.isMember(group._id.toString(), userId);
+    
+    const isMember = await this.groupService.isMember(room, userId);
     if (!isMember) {
-      await this.groupService.addMember(group._id.toString(), userId);
+      throw new Error('User is not a member of this group');
     }
 
     await client.join(room);
-    client.emit('joinSuccess', { room });
+    console.log(`User ${userId} joined room ${room}`);
 
-    const members = await this.groupService.getMembers(group._id.toString());
-    this.server.to(room).emit('updateMembers', members);
+    const members = await this.groupService.getMembers(room);
 
-    const messages = await this.messageService.getGroupMessages(group._id.toString());
-    client.emit('loadMessages', messages);
+    client.emit('joinSuccess', { room, members });
+
+    this.server.to(room).emit('memberUpdate', members);
+
   } catch (error) {
-    client.emit('error', { message: 'Failed to join room' });
+    console.error('Error in handleJoin:', error);
+    client.emit('joinError', { message: error.message });
   }
 }
-  @SubscribeMessage('sendMessage')
-  async handleMessage(
-    @MessageBody() data: { userId: string; room: string; content: string },
-    @ConnectedSocket() client: Socket,
-  ): Promise<void> {
-    const { userId, room, content } = data;
-    this.server.to(room).emit('message', { userId, room, content });
-  }
+
+@SubscribeMessage('sendMessage')
+async handleMessage(
+  @MessageBody() data: { userId: string; room: string; content: string },
+  @ConnectedSocket() client: Socket,
+): Promise<void> {
+  const { userId, room, content } = data;
+  const savedMessage = await this.messageService.create(userId, room, content);
+  this.server.to(room).emit('message', savedMessage);
+}
 
   @SubscribeMessage('createGroup')
   async handleCreateGroup(

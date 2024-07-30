@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpException, HttpStatus, Get, Param, InternalServerErrorException, Delete, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Body, HttpException, HttpStatus, Get, Param, InternalServerErrorException, Delete, NotFoundException, Put } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserDocument } from './user.model';
 
@@ -65,5 +65,15 @@ export class UserController {
     } catch (error) {
         console.log("error in getUser function in userController", error)
       }
+    }
+
+    @Put(':id/profile-picture')
+    async updateProfilePicture(@Param('id') userId: string, @Body('profilePictureUrl') profilePictureUrl: string) {
+      return this.userService.updateProfilePicture(userId, profilePictureUrl);
+    }
+
+    @Get(':id/profile-picture')
+    async getProfilePicture(@Param('id') userId: string) {
+      return this.userService.getUserProfilePicture(userId);
     }
   }
