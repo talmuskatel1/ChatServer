@@ -82,7 +82,7 @@ async addMember(groupId: string, userId: string): Promise<Group> {
     if (!isMember) {
       return this.addMember(group._id.toString(), userId);
     }
-
+  
     return group;
   }
 

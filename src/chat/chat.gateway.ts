@@ -48,21 +48,22 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 async handleJoin(
   @MessageBody() data: { userId: string; room: string },
   @ConnectedSocket() client: Socket,
-) {
+): Promise<void> {
+
   try {
     const { userId, room } = data;
-    console.log(`User ${userId} attempting to join room ${room}`);
-    
-    const group = await this.groupService.findById(room);
+    const name  = (await this.groupService.findById(room)).name;
+    const group = await this.groupService.findByName(name);
+    console.log(room);
     if (!group) {
-      throw new Error('Group not found');
+      client.emit('error', { message: 'Group does not exist' });
+      return;
     }
-    
-    const isMember = await this.groupService.isMember(room, userId);
+
+    const isMember = await this.groupService.isMember(group._id.toString(), userId);
     if (!isMember) {
       throw new Error('User is not a member of this group');
     }
-
     await client.join(room);
     console.log(`User ${userId} joined room ${room}`);
 
@@ -70,22 +71,24 @@ async handleJoin(
 
     client.emit('joinSuccess', { room, members });
 
-    this.server.to(room).emit('memberUpdate', members);
-
+    const messages = await this.messageService.getGroupMessages(group._id.toString());
+    client.emit('loadMessages', messages);
   } catch (error) {
-    console.error('Error in handleJoin:', error);
-    client.emit('joinError', { message: error.message });
+    client.emit('error', { message: 'Failed to join room' });
   }
 }
-
 @SubscribeMessage('sendMessage')
 async handleMessage(
   @MessageBody() data: { userId: string; room: string; content: string },
   @ConnectedSocket() client: Socket,
 ): Promise<void> {
   const { userId, room, content } = data;
-  const savedMessage = await this.messageService.create(userId, room, content);
-  this.server.to(room).emit('message', savedMessage);
+  if (!userId) {
+    console.error('Received message with undefined userId');
+    return;
+  }
+  const message = await this.messageService.create(userId, room, content);
+  this.server.to(room).emit('message', message);
 }
 
   @SubscribeMessage('createGroup')

@@ -61,12 +61,12 @@ export class UserController {
   async getUser(@Param('id') userId: string) {
     try {
       const user = await this.userService.findUserById(userId);
-      return user;
+      return { username: user.username };
     } catch (error) {
-        console.log("error in getUser function in userController", error)
-      }
+      console.log("error in getUser function in userController", error);
+      throw new NotFoundException(`User with id ${userId} not found`);
     }
-
+  }
     @Put(':id/profile-picture')
     async updateProfilePicture(@Param('id') userId: string, @Body('profilePictureUrl') profilePictureUrl: string) {
       return this.userService.updateProfilePicture(userId, profilePictureUrl);
