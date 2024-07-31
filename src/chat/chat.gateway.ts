@@ -45,33 +45,35 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   }
 
   @SubscribeMessage('join')
-  async handleJoin(
-    @MessageBody() data: { userId: string; room: string },
-    @ConnectedSocket() client: Socket,
-  ): Promise<void> {
-    try {
-      const { userId, room } = data;
-      
-      const group = await this.groupService.findById(room);
-      if (!group) {
-        client.emit('error', { message: 'Group does not exist' });
-        return;
-      }
+async handleJoin(
+  @MessageBody() data: { userId: string; room: string },
+  @ConnectedSocket() client: Socket,
+): Promise<void> {
+
+  try {
+    const { userId, room } = data;
+    const name  = (await this.groupService.findById(room)).name;
+    const group = await this.groupService.findByName(name);
+    console.log(room);
+    if (!group) {
+      client.emit('error', { message: 'Group does not exist' });
+      return;
+    }
 
     const isMember = await this.groupService.isMember(group._id.toString(), userId);
     if (!isMember) {
-      await this.groupService.addMember(group._id.toString(), userId);
+      throw new Error('User is not a member of this group');
     }
-
     await client.join(room);
-    client.emit('joinSuccess', { room });
+    console.log(`User ${userId} joined room ${room}`);
 
-    const members = await this.groupService.getMembers(group._id.toString());
-    this.server.to(room).emit('updateMembers', members);
+    const members = await this.groupService.getMembers(room);
+
+    client.emit('joinSuccess', { room, members });
 
     const messages = await this.messageService.getGroupMessages(group._id.toString());
     client.emit('loadMessages', messages);
-  }  catch (error) {
+  } catch (error) {
     client.emit('error', { message: 'Failed to join room' });
   }
 }
@@ -80,14 +82,13 @@ async handleMessage(
   @MessageBody() data: { userId: string; room: string; content: string },
   @ConnectedSocket() client: Socket,
 ): Promise<void> {
-  try {
-    const { userId, room, content } = data;
-    const savedMessage = await this.messageService.create(userId, room, content);
-    this.server.to(room).emit('message', savedMessage);
-  } catch (error) {
-    this.logger.error('Error handling message:', error);
-    client.emit('error', { message: 'Failed to send message' });
+  const { userId, room, content } = data;
+  if (!userId) {
+    console.error('Received message with undefined userId');
+    return;
   }
+  const message = await this.messageService.create(userId, room, content);
+  this.server.to(room).emit('message', message);
 }
 
   @SubscribeMessage('createGroup')
