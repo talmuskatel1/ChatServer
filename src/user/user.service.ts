@@ -7,6 +7,7 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UserService {
+ 
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Group.name) private groupModel: Model<GroupDocument>
@@ -59,11 +60,11 @@ export class UserService {
       { $pull: { groups: new Types.ObjectId(groupId) } },
       { new: true }
     ).exec();
-
+  
     if (!updatedUser) {
       throw new NotFoundException(`User with id ${userId} not found`);
     }
-
+  
     return updatedUser;
   }
 
@@ -77,4 +78,26 @@ export class UserService {
       { $pull: { members: userId } }
     ).exec();
   }
+
+  async findUserById(userId: string): Promise<User> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) {
+      throw new NotFoundException(`User with id ${userId} not found`);
+    }
+      return user;
+  }
+
+  async updateProfilePicture(userId: string, profilePictureUrl: string): Promise<User> {
+    return this.userModel.findByIdAndUpdate(userId, { profilePicture: profilePictureUrl }, { new: true }).exec();
+  }
+
+  async getUserProfilePicture(userId: string): Promise<{ profilePicture: string | null }> {
+    const user = await this.userModel.findById(userId).select('profilePicture').exec();
+    if (!user) {
+      throw new NotFoundException(`User with id ${userId} not found`);
+    }
+    return { profilePicture: user.profilePicture || null };
+  }
+
+  
 }

@@ -15,6 +15,7 @@ export class User {
 
   @Prop({ type: [{ type: Types.ObjectId, ref: 'Group' }] })
   groups: Types.ObjectId[] | Group[];
+
 }
 
 export type UserDocument = User & Document;

@@ -5,8 +5,6 @@ import { User } from '../user/user.model';
 @Schema()
 export class Group {
 
-  _id: Types.ObjectId;
-
   @Prop({ required: true, unique: true })
   name: string;
 
@@ -15,6 +13,9 @@ export class Group {
 
   @Prop({ type: [{ type: Types.ObjectId, ref: 'Message' }] })
   messages: Types.ObjectId[];
+
+  @Prop()
+  groupPicture?: string;
 }
 
 export type GroupDocument = Group & Document;

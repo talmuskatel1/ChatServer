@@ -19,7 +19,7 @@ import { Logger } from '@nestjs/common';
     origin: 'http://localhost:5173', 
     credentials: true,
   },
-  transports: ['websocket', 'polling'], 
+  transports: ['websocket'], 
 })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
@@ -45,15 +45,16 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   }
 
   @SubscribeMessage('join')
-  @SubscribeMessage('join')
 async handleJoin(
   @MessageBody() data: { userId: string; room: string },
   @ConnectedSocket() client: Socket,
 ): Promise<void> {
+
   try {
     const { userId, room } = data;
-    
-    const group = await this.groupService.findByName(room);
+    const name  = (await this.groupService.findById(room)).name;
+    const group = await this.groupService.findByName(name);
+    console.log(room);
     if (!group) {
       client.emit('error', { message: 'Group does not exist' });
       return;
@@ -61,14 +62,14 @@ async handleJoin(
 
     const isMember = await this.groupService.isMember(group._id.toString(), userId);
     if (!isMember) {
-      await this.groupService.addMember(group._id.toString(), userId);
+      throw new Error('User is not a member of this group');
     }
-
     await client.join(room);
-    client.emit('joinSuccess', { room });
+    console.log(`User ${userId} joined room ${room}`);
 
-    const members = await this.groupService.getMembers(group._id.toString());
-    this.server.to(room).emit('updateMembers', members);
+    const members = await this.groupService.getMembers(room);
+
+    client.emit('joinSuccess', { room, members });
 
     const messages = await this.messageService.getGroupMessages(group._id.toString());
     client.emit('loadMessages', messages);
@@ -76,14 +77,19 @@ async handleJoin(
     client.emit('error', { message: 'Failed to join room' });
   }
 }
-  @SubscribeMessage('sendMessage')
-  async handleMessage(
-    @MessageBody() data: { userId: string; room: string; content: string },
-    @ConnectedSocket() client: Socket,
-  ): Promise<void> {
-    const { userId, room, content } = data;
-    this.server.to(room).emit('message', { userId, room, content });
+@SubscribeMessage('sendMessage')
+async handleMessage(
+  @MessageBody() data: { userId: string; room: string; content: string },
+  @ConnectedSocket() client: Socket,
+): Promise<void> {
+  const { userId, room, content } = data;
+  if (!userId) {
+    console.error('Received message with undefined userId');
+    return;
   }
+  const message = await this.messageService.create(userId, room, content);
+  this.server.to(room).emit('message', message);
+}
 
   @SubscribeMessage('createGroup')
   async handleCreateGroup(
@@ -102,28 +108,26 @@ async handleJoin(
 
 
   @SubscribeMessage('leaveGroup')
-  async handleLeaveGroup(
-    @MessageBody() data: { userId: string; groupName: string },
-    @ConnectedSocket() client: Socket,
-  ): Promise<void> {
-    const { userId, groupName } = data;
-    const group = await this.groupService.findByName(groupName);
-    
-    if (group) {
-      await this.groupService.removeMember(group._id.toString(), userId);
-      await this.userService.removeGroup(userId, group._id.toString());
-      
-      await client.leave(groupName);
-      client.emit('leftGroup', { groupName });
-      this.server.to(groupName).emit('memberLeft', { userId, groupName });
+async handleLeaveGroup(
+  @MessageBody() data: { userId: string; groupId: string },
+  @ConnectedSocket() client: Socket,
+): Promise<void> {
+  const { userId, groupId } = data;
 
-      const updatedGroup = await this.groupService.findByName(groupName);
-      if (updatedGroup.members.length === 0) {
-        await this.groupService.deleteGroup(updatedGroup._id.toString());
-        this.server.emit('groupDeleted', { groupName });
-      }
+  try {
+    const updatedGroup = await this.groupService.leaveGroup(userId, groupId);
+
+    this.server.to(groupId).emit('memberLeft', { userId, groupId });
+    await client.leave(groupId);
+
+    if (updatedGroup.members.length === 0) {
+      await this.groupService.deleteGroup(groupId);
+      this.server.emit('groupDeleted', { groupId });
     }
+  } catch (error) {
+    client.emit('error', { message: 'Failed to leave group' });
   }
+}
 
   @SubscribeMessage('deleteGroup')
   async handleDeleteGroup(
