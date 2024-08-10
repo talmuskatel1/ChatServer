@@ -87,7 +87,6 @@ async addMember(groupId: string, userId: string): Promise<Group> {
   }
 
   async updateGroupPicture(groupId: string, groupPictureUrl: string): Promise<Group> {
-    console.log(`Updating group picture for group ${groupId} with URL ${groupPictureUrl}`);
     const updatedGroup = await this.groupModel.findByIdAndUpdate(
       groupId,
       { $set: { groupPicture: groupPictureUrl } },
@@ -117,8 +116,6 @@ async addMember(groupId: string, userId: string): Promise<Group> {
 
     return group;
   }
-
-
 
   async addMessage(groupId: string, messageId: string): Promise<Group> {
     return this.groupModel.findByIdAndUpdate(

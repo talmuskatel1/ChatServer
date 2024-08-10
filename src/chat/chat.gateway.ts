@@ -109,28 +109,32 @@ async handleMessage(
 
   @SubscribeMessage('leaveGroup')
   async handleLeaveGroup(
-    @MessageBody() data: { userId: string; groupName: string },
+    @MessageBody() data: { userId: string; groupId: string },
     @ConnectedSocket() client: Socket,
   ): Promise<void> {
-    const { userId, groupName } = data;
-    const group = await this.groupService.findByName(groupName);
-    
-    if (group) {
-      await this.groupService.removeMember(group._id.toString(), userId);
-      await this.userService.removeGroup(userId, group._id.toString());
+    const { userId, groupId } = data;
+    try {
+      const group = await this.groupService.findById(groupId);
       
-      await client.leave(groupName);
-      client.emit('leftGroup', { groupName });
-      this.server.to(groupName).emit('memberLeft', { userId, groupName });
-
-      const updatedGroup = await this.groupService.findByName(groupName);
-      if (updatedGroup.members.length === 0) {
-        await this.groupService.deleteGroup(updatedGroup._id.toString());
-        this.server.emit('groupDeleted', { groupName });
+      if (group) {
+        await this.groupService.leaveGroup(userId, groupId);
+        
+        client.leave(groupId);
+        client.emit('leftGroup', { userId, groupId });
+        this.server.to(groupId).emit('memberLeft', { userId, groupId });
+  
+        const updatedGroup = await this.groupService.findById(groupId);
+        if (updatedGroup.members.length === 0) {
+          await this.groupService.deleteGroup(groupId);
+          this.server.emit('groupDeleted', { groupId });
+        }
       }
+      console.log(`User ${userId} left group ${groupId}`);
+    } catch (error) {
+      console.error('Error in handleLeaveGroup:', error);
+      client.emit('error', { message: 'Failed to leave group' });
     }
   }
-
   @SubscribeMessage('deleteGroup')
   async handleDeleteGroup(
     @MessageBody() data: { userId: string; groupName: string },
