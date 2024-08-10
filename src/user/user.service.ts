@@ -60,11 +60,11 @@ export class UserService {
       { $pull: { groups: new Types.ObjectId(groupId) } },
       { new: true }
     ).exec();
-
+  
     if (!updatedUser) {
       throw new NotFoundException(`User with id ${userId} not found`);
     }
-
+  
     return updatedUser;
   }
 
@@ -103,4 +103,6 @@ export class UserService {
     console.log(`User found. Profile picture: ${profilePicture}`);
     return { profilePicture };
   }
+
+  
 }
