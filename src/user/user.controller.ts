@@ -76,4 +76,17 @@ export class UserController {
     async getProfilePicture(@Param('id') userId: string) {
       return this.userService.getUserProfilePicture(userId);
     }
+
+    @Put(':userId/leave-group/:groupId')
+async leaveGroup(@Param('userId') userId: string, @Param('groupId') groupId: string) {
+  try {
+    const updatedUser = await this.userService.removeGroup(userId, groupId);
+    return { message: 'Successfully left the group', user: updatedUser };
+  } catch (error) {
+    if (error instanceof NotFoundException) {
+      throw new HttpException(error.message, HttpStatus.NOT_FOUND);
+    }
+    throw new HttpException('An error occurred while leaving the group', HttpStatus.INTERNAL_SERVER_ERROR);
+  }
+}
   }

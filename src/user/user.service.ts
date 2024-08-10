@@ -91,11 +91,16 @@ export class UserService {
     return this.userModel.findByIdAndUpdate(userId, { profilePicture: profilePictureUrl }, { new: true }).exec();
   }
 
-  async getUserProfilePicture(userId: string): Promise<{ profilePicture: string | null }> {
+  async getUserProfilePicture(userId: string): Promise<{ profilePicture: string }> {
+    const defaultPicture = 'https://example.com/default-profile-pic.jpg';
+    console.log(`Fetching profile picture for user: ${userId}`);
     const user = await this.userModel.findById(userId).select('profilePicture').exec();
     if (!user) {
+      console.log(`User with id ${userId} not found`);
       throw new NotFoundException(`User with id ${userId} not found`);
     }
-    return { profilePicture: user.profilePicture || null };
+    const profilePicture = user.profilePicture || defaultPicture;
+    console.log(`User found. Profile picture: ${profilePicture}`);
+    return { profilePicture };
   }
 }
