@@ -34,6 +34,7 @@ async isMember(groupId: string, userId: string): Promise<boolean> {
   return group.members.some(memberId => memberId.toString() === userId);
 }
 async addMember(groupId: string, userId: string): Promise<Group> {
+  console.log("addMember");
   const group = await this.groupModel.findByIdAndUpdate(
     groupId,
     { $addToSet: { members: new Types.ObjectId(userId) } },
@@ -79,6 +80,8 @@ async addMember(groupId: string, userId: string): Promise<Group> {
     }
     
     const isMember = await this.isMember(group._id.toString(), userId);
+    console.log(isMember);
+
     if (!isMember) {
       return this.addMember(group._id.toString(), userId);
     }
@@ -87,6 +90,7 @@ async addMember(groupId: string, userId: string): Promise<Group> {
   }
 
   async updateGroupPicture(groupId: string, groupPictureUrl: string): Promise<Group> {
+    console.log(`Updating group picture for group ${groupId} with URL ${groupPictureUrl}`);
     const updatedGroup = await this.groupModel.findByIdAndUpdate(
       groupId,
       { $set: { groupPicture: groupPictureUrl } },
@@ -102,19 +106,28 @@ async addMember(groupId: string, userId: string): Promise<Group> {
   }
 
   async leaveGroup(userId: string, groupId: string): Promise<Group> {
-    const group = await this.groupModel.findByIdAndUpdate(
-      groupId,
-      { $pull: { members: userId } },
-      { new: true }
-    ).exec();
-
+    const group = await this.groupModel.findById(groupId);
     if (!group) {
       throw new NotFoundException(`Group with id ${groupId} not found`);
     }
-
+    
+    if (!group.members.some(memberId => memberId.toString() === userId)) {
+      throw new NotFoundException(`User ${userId} is not a member of group ${groupId}`);
+    }
+  
+    const result = await this.groupModel.updateOne(
+      { _id: new Types.ObjectId(groupId) },
+      { $pull: { members: new Types.ObjectId(userId) } }
+    ).exec();
+  
+    if (result.modifiedCount === 0) {
+      throw new InternalServerErrorException(`Failed to update group ${groupId}`);
+    }
+  
+    const updatedGroup = await this.groupModel.findById(groupId).exec();
     await this.userService.removeGroup(userId, groupId);
-
-    return group;
+  
+    return updatedGroup;
   }
 
   async addMessage(groupId: string, messageId: string): Promise<Group> {

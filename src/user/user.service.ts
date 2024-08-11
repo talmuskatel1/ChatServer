@@ -60,11 +60,11 @@ export class UserService {
       { $pull: { groups: new Types.ObjectId(groupId) } },
       { new: true }
     ).exec();
-
+  
     if (!updatedUser) {
       throw new NotFoundException(`User with id ${userId} not found`);
     }
-
+  
     return updatedUser;
   }
 
@@ -91,16 +91,13 @@ export class UserService {
     return this.userModel.findByIdAndUpdate(userId, { profilePicture: profilePictureUrl }, { new: true }).exec();
   }
 
-  async getUserProfilePicture(userId: string): Promise<{ profilePicture: string }> {
-    const defaultPicture = 'https://example.com/default-profile-pic.jpg';
-    console.log(`Fetching profile picture for user: ${userId}`);
+  async getUserProfilePicture(userId: string): Promise<{ profilePicture: string | null }> {
     const user = await this.userModel.findById(userId).select('profilePicture').exec();
     if (!user) {
-      console.log(`User with id ${userId} not found`);
       throw new NotFoundException(`User with id ${userId} not found`);
     }
-    const profilePicture = user.profilePicture || defaultPicture;
-    console.log(`User found. Profile picture: ${profilePicture}`);
-    return { profilePicture };
+    return { profilePicture: user.profilePicture || null };
   }
+
+  
 }
