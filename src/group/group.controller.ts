@@ -1,6 +1,7 @@
-import { Controller, Post, Body, Get, Param, InternalServerErrorException, Put } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, InternalServerErrorException, Put, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { GroupService } from './group.service';
-
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Express } from 'express';
 @Controller('groups')
 export class GroupController {
   constructor(private groupService: GroupService) {}
@@ -26,14 +27,18 @@ export class GroupController {
   }
 
   @Put(':id/group-picture')
-async updateGroupPicture(@Param('id') groupId: string, @Body('groupPictureUrl') groupPictureUrl: string) {
-  try {
-    const updatedGroup = await this.groupService.updateGroupPicture(groupId, groupPictureUrl);
-    return updatedGroup;
-  } catch (error) {
-    console.error('Error updating group picture:', error);
+  @UseInterceptors(FileInterceptor('image'))
+  async updateGroupPicture(
+    @Param('id') groupId: string,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    try {
+      return await this.groupService.updateGroupPicture(groupId, file);
+    } catch (error) {
+      console.error('Error updating group picture:', error);
+      throw new InternalServerErrorException('Failed to update group picture');
+    }
   }
-}
 
 @Put(':id/leave')
 async leaveGroup(@Param('id') groupId: string, @Body('userId') userId: string) {

@@ -4,7 +4,9 @@ import { Model, Types } from 'mongoose';
 import { Group, GroupDocument } from './group.model';
 import { User, UserDocument } from '../user/user.model';
 import { UserService } from 'src/user/user.service';
-
+import * as fs from 'fs';
+import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class GroupService {
   constructor(@InjectModel(Group.name) private groupModel: Model<GroupDocument>,
@@ -89,20 +91,28 @@ async addMember(groupId: string, userId: string): Promise<Group> {
     return group;
   }
 
-  async updateGroupPicture(groupId: string, groupPictureUrl: string): Promise<Group> {
-    console.log(`Updating group picture for group ${groupId} with URL ${groupPictureUrl}`);
-    const updatedGroup = await this.groupModel.findByIdAndUpdate(
-      groupId,
-      { $set: { groupPicture: groupPictureUrl } },
-      { new: true, select: '+groupPicture' }
-    ).exec();
-  
-    if (!updatedGroup) {
+  async updateGroupPicture(groupId: string, file: Express.Multer.File): Promise<Group> {
+    const group = await this.groupModel.findById(groupId);
+    if (!group) {
       throw new NotFoundException(`Group with id ${groupId} not found`);
     }
-  
-    console.log('Updated group:', JSON.stringify(updatedGroup, null, 2));
-    return updatedGroup;
+
+    if (group.groupPicture) {
+      const oldFilePath = path.join(process.cwd(), group.groupPicture);
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath);
+      }
+    }
+
+    const fileExtension = path.extname(file.originalname);
+    const fileName = `${uuidv4()}${fileExtension}`;
+    const filePath = path.join('uploads', 'group-pictures', fileName);
+    const fullPath = path.join(process.cwd(), filePath);
+
+    fs.writeFileSync(fullPath, file.buffer);
+
+    group.groupPicture = filePath;
+    return group.save();
   }
 
   async leaveGroup(userId: string, groupId: string): Promise<Group> {

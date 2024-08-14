@@ -47,7 +47,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   @SubscribeMessage('join')
 async handleJoin(
   @MessageBody() data: { userId: string; room: string },
-  @ConnectedSocket() client: Socket,
+  @ConnectedSocket() client: Socket,  
 ): Promise<void> {
 
   try {

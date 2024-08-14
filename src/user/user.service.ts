@@ -4,7 +4,9 @@ import { Model, Types } from 'mongoose';
 import { Group, GroupDocument } from 'src/group/group.model';
 import { User, UserDocument } from '../user/user.model';
 import * as bcrypt from 'bcrypt';
-
+import * as fs from 'fs';
+import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class UserService {
  
@@ -87,8 +89,28 @@ export class UserService {
       return user;
   }
 
-  async updateProfilePicture(userId: string, profilePictureUrl: string): Promise<User> {
-    return this.userModel.findByIdAndUpdate(userId, { profilePicture: profilePictureUrl }, { new: true }).exec();
+  async updateProfilePicture(userId: string, file: Express.Multer.File): Promise<User> {
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException(`User with id ${userId} not found`);
+    }
+
+    if (user.profilePicture) {
+      const oldFilePath = path.join(process.cwd(), user.profilePicture);
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath);
+      }
+    }
+
+    const fileExtension = path.extname(file.originalname);
+    const fileName = `${uuidv4()}${fileExtension}`;
+    const filePath = path.join('uploads', 'profile-pictures', fileName);
+    const fullPath = path.join(process.cwd(), filePath);
+
+    fs.writeFileSync(fullPath, file.buffer);
+
+    user.profilePicture = filePath;
+    return user.save();
   }
 
   async getUserProfilePicture(userId: string): Promise<{ profilePicture: string | null }> {

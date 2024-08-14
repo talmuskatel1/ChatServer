@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param} from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, HttpException, HttpStatus } from '@nestjs/common';
 import { MessageService } from './message.service';
 
 @Controller('messages')
@@ -11,14 +11,12 @@ export class MessageController {
       const message = await this.messageService.create(messageData.senderId, messageData.groupId, messageData.content);
       return message;
     } catch (error) {
-      console.error('Error sending message:', error);
+      throw new HttpException('Error sending message', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
-  
-
 
   @Get('room/:roomId')
   async getGroupMessages(@Param('roomId') roomId: string) {
-    return this.messageService.getGroupMessages(roomId);
+    return await this.messageService.getGroupMessages(roomId);
   }
 }
