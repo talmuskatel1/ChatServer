@@ -44,4 +44,13 @@ export class GroupController {
 async leaveGroup(@Param('id') groupId: string, @Body('userId') userId: string) {
   return this.groupService.leaveGroup(userId, groupId);
 }
+
+@Put(':id/make-private')
+async makeGroupPrivate(@Param('id') groupId: string) {
+  return this.groupService.makeGroupPrivate(groupId);
+}
+@Put(':id/make-public')
+async makeGroupPublic(@Param('id') groupId: string) {
+  return this.groupService.makeGroupPublic(groupId);
+}
 }

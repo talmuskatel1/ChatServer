@@ -1,10 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { User } from '../user/user.model';
 
 @Schema()
 export class Group {
-
   @Prop({ required: true, unique: true })
   name: string;
 
@@ -16,8 +14,10 @@ export class Group {
 
   @Prop()
   groupPicture?: string;
+
+  @Prop({ default: false })
+  isPrivate: boolean;
 }
 
 export type GroupDocument = Group & Document;
-export const GroupSchema = SchemaFactory.createForClass(Group);
-
+export const GroupSchema = SchemaFactory.createForClass(Group);``

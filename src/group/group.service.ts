@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Group, GroupDocument } from './group.model';
@@ -9,6 +9,7 @@ import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class GroupService {
+
   constructor(@InjectModel(Group.name) private groupModel: Model<GroupDocument>,
   @InjectModel(User.name) private userModel: Model<UserDocument>,
   private userService: UserService
@@ -79,6 +80,10 @@ async addMember(groupId: string, userId: string): Promise<Group> {
     const group = await this.findByName(groupName);
     if (!group) {
       throw new NotFoundException(`Group with name ${groupName} not found`);
+    }
+
+    if (group.isPrivate) {
+      throw new ForbiddenException('This group is private and cannot be joined');
     }
     
     const isMember = await this.isMember(group._id.toString(), userId);
@@ -189,5 +194,30 @@ async addMember(groupId: string, userId: string): Promise<Group> {
     }
     return group;
   }
+  async makeGroupPrivate(groupId: string): Promise<Group> {
+    const group = await this.groupModel.findByIdAndUpdate(
+      groupId,
+      { isPrivate: true },
+      { new: true }
+    ).exec();
 
+    if (!group) {
+      throw new NotFoundException(`Group with id ${groupId} not found`);
+    }
+
+    return group;
+  }
+
+ async makeGroupPublic(groupId: string) {
+    const group = await this.groupModel.findByIdAndUpdate(
+      groupId,
+      { isPrivate: false },
+      { new: true }
+    ).exec();
+
+    if (!group) {
+      throw new NotFoundException(`Group with id ${groupId} not found`);
+    }
+
+    return group;  }
 }
