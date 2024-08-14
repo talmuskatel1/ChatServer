@@ -1,34 +1,52 @@
-import { Controller, Post, Body, HttpException, HttpStatus, Get, Param, InternalServerErrorException, Delete, NotFoundException, Put } from '@nestjs/common';
+import { Controller, Post, Body, HttpException, HttpStatus, Get, Param, InternalServerErrorException, Delete, NotFoundException, Put, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserDocument } from './user.model';
-
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Express } from 'express';
 @Controller('users')
 export class UserController {
   constructor(private userService: UserService) {}
 
   @Post('signup')
-  async signup(@Body() signupData: { username: string; password: string }): Promise<{ userId: string; username: string }> {
+  async signup(@Body() signupData: { username: string; password: string }) {
     try {
-      const user: UserDocument = await this.userService.create(signupData.username, signupData.password);
-      return { userId: user._id.toString(), username: user.username };
+      const user = await this.userService.create(signupData.username, signupData.password);
+      return { 
+        userId: user._id.toString(), 
+        username: user.username,
+        profilePictureUrl: user.profilePicture || null
+      };
     } catch (error) {
-      throw new HttpException('Username already exists', HttpStatus.BAD_REQUEST);
+      console.error('Signup error:', error);
+      throw new HttpException(
+        error.message || 'Username already exists or invalid data', 
+        HttpStatus.BAD_REQUEST
+      );
     }
   }
 
 
   @Post('login')
-  async login(@Body() loginData: { username: string; password: string }): Promise<{ userId: string; username: string }> {
+  async login(@Body() loginData: { username: string; password: string }) {
     try {
-      const user: UserDocument | null = await this.userService.validateUser(loginData.username, loginData.password);
+      const user = await this.userService.validateUser(loginData.username, loginData.password);
       if (user) {
-        return { userId: user._id.toString(), username: user.username };
+        return { 
+          userId: user._id.toString(), 
+          username: user.username,
+          profilePictureUrl: user.profilePicture || null
+        };
       } else {
         throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
       }
     } catch (error) {
       console.error('Login error:', error);
-      throw new InternalServerErrorException('An error occurred during login');
+      throw new HttpException(
+        error.message || 'An error occurred during login', 
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 
@@ -67,13 +85,32 @@ export class UserController {
       throw new NotFoundException(`User with id ${userId} not found`);
     }
   }
-    @Put(':id/profile-picture')
-    async updateProfilePicture(@Param('id') userId: string, @Body('profilePictureUrl') profilePictureUrl: string) {
-      return this.userService.updateProfilePicture(userId, profilePictureUrl);
+  @Put(':id/profile-picture')
+  @UseInterceptors(FileInterceptor('image'))
+  async updateProfilePicture(
+    @Param('id') userId: string,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    try {
+      return await this.userService.updateProfilePicture(userId, file);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new HttpException(error.message, HttpStatus.NOT_FOUND);
+      }
+      throw new InternalServerErrorException('Failed to update profile picture');
     }
-
-    @Get(':id/profile-picture')
-    async getProfilePicture(@Param('id') userId: string) {
-      return this.userService.getUserProfilePicture(userId);
+  }
+  @Get(':id/profile-picture')
+  async getProfilePicture(@Param('id') userId: string) {
+    try {
+      const result = await this.userService.getUserProfilePicture(userId);
+      if (!result.profilePicture) {
+        throw new NotFoundException('No profile picture found for this user');
+      }
+      return result;
+    } catch (error) {
+      console.error(`Error fetching profile picture for user ${userId}:`, error);
+      throw error;
     }
+  }
   }
